@@ -1,26 +1,25 @@
 {
   "name": "aiocraft",
-  "version": "0.1.0",
-  "scripts": {
-    "dev": "vite"
-  },
-  "dependencies": {
-    "@types/three": "^0.152.1",
-    "three": "^0.151.3",
-    "typescript": "^4.9.5",
-    "vite": "^3.2.5"
-  },
-  "devDependencies": {},
+  "version": "1.0.0",
+  "description": "",
   "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/valentecaio/aiocraft.git"
   },
-  "author": "",
+  "author": "valentecaio",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/valentecaio/aiocraft/issues"
   },
   "homepage": "https://github.com/valentecaio/aiocraft#readme",
-  "description": ""
+  "dependencies": {
+    "cannon-es": "^0.20.0",
+    "three": "^0.158.0",
+    "vite": "^4.5.0"
+  }
 }
