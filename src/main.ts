@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import * as Noise from 'noisejs';
 import Stats from 'three/examples/jsm/libs/stats.module';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
@@ -9,15 +10,19 @@ let camera: THREE.PerspectiveCamera;
 let controls: OrbitControls;
 let stats: Stats;
 let world: CANNON.World;
+let textures: any = {};
 
 function init() {
   // Three.js variables
   stats = new Stats();
   document.body.appendChild(stats.dom);
-  scene = new THREE.Scene();
+
   renderer = new THREE.WebGLRenderer();
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x7cd1e9); // clear sky blue
 
   // camera
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -26,8 +31,7 @@ function init() {
   camera.position.z = 5;
 
   // lights
-  const ambientLight = new THREE.AmbientLight(0x404040);
-  scene.add(ambientLight);
+  scene.add(new THREE.AmbientLight(0xffffff));
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
   directionalLight.position.set(10, 10, 10);
   scene.add(directionalLight);
@@ -38,7 +42,6 @@ function init() {
   controls.screenSpacePanning = false;
   controls.listenToKeyEvents( window );
   controls.keys = { UP: 'KeyW', LEFT: 'KeyA', BOTTOM: 'KeyS', RIGHT: 'KeyD' };
-  console.log(controls)
 
   // window resize
   window.addEventListener('resize', () => {
@@ -47,11 +50,26 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
+  // textures
+  const textureLoader = new THREE.TextureLoader();
+  textures = {
+    grass: textureLoader.load('textures/grass.png'),
+    stone: textureLoader.load('textures/stone.png'),
+    earth: textureLoader.load('textures/earth.png'),
+    water: textureLoader.load('textures/water.png'),
+    snow:  textureLoader.load('textures/snow.png'),
+    lava:  textureLoader.load('textures/lava.png'),
+    earth_dark: textureLoader.load('textures/earth_dark.png'),
+    stone_dark: textureLoader.load('textures/stone_dark.png'),
+  };
+
   // Cannon.js variables
   world = new CANNON.World();
-  world.gravity.set(0, -9.82, 0);
+  world.gravity.set(0, -9.8, 0);
   world.broadphase = new CANNON.NaiveBroadphase();
+}
 
+function createWorld() {
   // create floor of cubes
   const planeSize = 20;
   const cubeSize = 1;
@@ -66,7 +84,9 @@ function init() {
       world.addBody(cubeBody);
 
       const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-      const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+      // chose a random texture for the material
+      console.log(textures);
+      const material = new THREE.MeshBasicMaterial({ map: Math.random() > 0.2 ? textures['grass'] : textures['stone'] });
       const cubeMesh = new THREE.Mesh(geometry, material);
       cubeMesh.position.set(i, halfCubeSize, j);
       scene.add(cubeMesh);
@@ -75,6 +95,7 @@ function init() {
 }
 
 init();
+createWorld();
 
 // Set up animation loop
 const animate = () => {
