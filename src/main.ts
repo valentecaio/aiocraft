@@ -15,6 +15,17 @@ let world: CANNON.World;
 let textures: any = {};
 let noise: Noise;
 
+// global settings
+const cubeSize = 1;
+const gravity = -9.8;
+
+// terrain generation settings
+const planeSize = 50;      // 50 x 50 cubes in the plane
+const noiseFactorY = 7;    // factor of terrain noise in Y direction. Bigger values create higher mountains
+const noiseFactorXZ = 20;  // factor of terrain noise in X and Z directions. Bigger values create more variation in terrain
+const noiseFactorAdd = 5;  // bigger values mean higher terrain
+const waterLevel = 3       // empty space below this level is water
+
 // global game state
 let state = {
   grass: [],
@@ -83,7 +94,7 @@ function init() {
 
   // Cannon.js variables
   world = new CANNON.World();
-  world.gravity.set(0, -9.8, 0);
+  world.gravity.set(0, gravity, 0);
   world.broadphase = new CANNON.NaiveBroadphase();
 }
 
@@ -141,8 +152,6 @@ function createInstancedMesh(geometry, cubes, texture, transparent = false) {
 }
 
 function createWorld() {
-  const planeSize = 50;
-  const cubeSize = 1;
   noise = new Noise(Date.now() % 65536);
 
   for (let i = 0; i < planeSize; i += cubeSize) {
@@ -151,7 +160,7 @@ function createWorld() {
       state.stone.push(new Cube(i, 0, j))
 
       // use noise to create random height of cubes
-      const height = Math.floor(noise.perlin2(i / 10, j / 10) * 10) + 5;
+      const height = Math.floor(noise.perlin2(i/noiseFactorXZ, j/noiseFactorXZ) * noiseFactorY) + noiseFactorAdd;
 
       // create grass cubes
       for (let k = 1; k < height; k++) {
@@ -159,8 +168,7 @@ function createWorld() {
       }
 
       // fill bottom with water
-      let waterHeight = 3;
-      for (let k = Math.max(height, 1); k < waterHeight; k++) {
+      for (let k = Math.max(height, 1); k < waterLevel; k++) {
         state.water.push(new Cube(i, k, j))
       }
     }
@@ -172,7 +180,7 @@ function createWorld() {
   createInstancedMesh(geometry, state.water, textures.water, true);
 }
 
-// Set up animation loop
+// animation loop
 function animate () {
   // requestAnimationFrame(animate);
 
