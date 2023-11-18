@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import * as Noise from 'noisejs';
 import Stats from 'three/examples/jsm/libs/stats.module';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { Noise } from 'noisejs';
 
 let scene: THREE.Scene;
 let renderer: THREE.WebGLRenderer;
@@ -11,13 +11,14 @@ let controls: OrbitControls;
 let stats: Stats;
 let world: CANNON.World;
 let textures: any = {};
+let noise: Noise;
 
 function init() {
   // Three.js variables
   stats = new Stats();
   document.body.appendChild(stats.dom);
 
-  renderer = new THREE.WebGLRenderer();
+  renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
@@ -53,14 +54,21 @@ function init() {
   // textures
   const textureLoader = new THREE.TextureLoader();
   textures = {
-    grass: textureLoader.load('textures/grass.png'),
-    stone: textureLoader.load('textures/stone.png'),
-    earth: textureLoader.load('textures/earth.png'),
-    water: textureLoader.load('textures/water.png'),
-    snow:  textureLoader.load('textures/snow.png'),
-    lava:  textureLoader.load('textures/lava.png'),
-    earth_dark: textureLoader.load('textures/earth_dark.png'),
-    stone_dark: textureLoader.load('textures/stone_dark.png'),
+    grass: {
+      top:    textureLoader.load('textures/v2/grass1.png'),
+      side:   textureLoader.load('textures/v2/grass2.png'),
+      bottom: textureLoader.load('textures/v2/grass3.png'),
+    },
+    stone: {
+      top:    textureLoader.load('textures/v1/stone_dark.png'),
+      side:   textureLoader.load('textures/v1/stone_dark.png'),
+      bottom: textureLoader.load('textures/v1/stone_dark.png'),
+    },
+    water: {
+      top:    textureLoader.load('textures/v1/water.png'),
+      side:   textureLoader.load('textures/v1/water.png'),
+      bottom: textureLoader.load('textures/v1/water.png'),
+    },
   };
 
   // Cannon.js variables
@@ -69,27 +77,53 @@ function init() {
   world.broadphase = new CANNON.NaiveBroadphase();
 }
 
+function createCube(i, j, k, side, texture, transparent) {
+  const cube = new CANNON.Box(new CANNON.Vec3(side, side, side));
+  const cubeBody = new CANNON.Body({ mass: 0, position: new CANNON.Vec3(i + side/2, j + side/2, k + side/2) });
+  cubeBody.addShape(cube);
+  world.addBody(cubeBody);
+
+  const materials = [
+    texture.side,
+    texture.side,
+    texture.top,
+    texture.bottom,
+    texture.side,
+    texture.side,
+  ].map(texture => new THREE.MeshBasicMaterial({ map: texture }));
+  // {map: texture, transparent: true, opacity: transparent ? 0.3 : 1}
+
+  const cubeMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(side, side, side),
+    materials
+  );
+  cubeMesh.position.set(i, j, k);
+  scene.add(cubeMesh);
+}
+
 function createWorld() {
-  // create floor of cubes
   const planeSize = 20;
   const cubeSize = 1;
-  const halfPlaneSize = planeSize / 2;
-  const halfCubeSize = cubeSize / 2;
+  noise = new Noise(Date.now() % 65536);
 
-  for (let i = -halfPlaneSize; i < halfPlaneSize; i += cubeSize) {
-    for (let j = -halfPlaneSize; j < halfPlaneSize; j += cubeSize) {
-      const cube = new CANNON.Box(new CANNON.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2));
-      const cubeBody = new CANNON.Body({ mass: 0, position: new CANNON.Vec3(i + halfCubeSize, halfCubeSize, j + halfCubeSize) });
-      cubeBody.addShape(cube);
-      world.addBody(cubeBody);
+  for (let i = 0; i < planeSize; i += cubeSize) {
+    for (let j = 0; j < planeSize; j += cubeSize) {
+      // base floor: strong stone
+      createCube(i, 0, j, cubeSize, textures['stone'], false)
 
-      const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-      // chose a random texture for the material
-      console.log(textures);
-      const material = new THREE.MeshBasicMaterial({ map: Math.random() > 0.2 ? textures['grass'] : textures['stone'] });
-      const cubeMesh = new THREE.Mesh(geometry, material);
-      cubeMesh.position.set(i, halfCubeSize, j);
-      scene.add(cubeMesh);
+      // use noise to create random height of cubes
+      const height = Math.floor(noise.perlin2(i / 10, j / 10) * 10) + 5;
+
+      // create grass/stone cubes
+      for (let k = 1; k < height; k++) {
+        createCube(i, k, j, cubeSize, textures['grass'], false)
+      }
+
+      // fill bottom with water
+      let waterHeight = 3;
+      for (let k = Math.max(height, 1); k < waterHeight; k++) {
+        createCube(i, k, j, cubeSize, textures['water'], true)
+      }
     }
   }
 }
