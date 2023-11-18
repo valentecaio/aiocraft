@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import Stats from 'three/examples/jsm/libs/stats.module';
-import { FirstPersonControls } from 'three/examples/jsm/controls/FirstPersonControls';
+import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
 import { Noise } from 'noisejs';
 
 import { Cube } from './cube';
@@ -9,10 +9,11 @@ import { Cube } from './cube';
 let scene: THREE.Scene;
 let renderer: THREE.WebGLRenderer;
 let camera: THREE.PerspectiveCamera;
+let raycaster: THREE.Raycaster;
 let clock: THREE.Clock;
-let controls: FirstPersonControls;
+let controls: PointerLockControls;
 let stats: Stats;
-let world: CANNON.World;
+// let world: CANNON.World;
 let textures: any = {};
 
 // global settings
@@ -32,6 +33,16 @@ let state = {
   stone: [],
   water: [],
 };
+const objects = [];
+
+let moveForward = false;
+let moveBackward = false;
+let moveLeft = false;
+let moveRight = false;
+let canJump = false;
+
+const velocity = new THREE.Vector3();
+const direction = new THREE.Vector3();
 
 function init() {
   // Three.js variables
@@ -47,13 +58,14 @@ function init() {
   scene.background = new THREE.Color(0x7cd1e9); // clear sky blue
 
   clock = new THREE.Clock();
+  raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 10);
 
   // camera
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  scene.add(new THREE.CameraHelper(camera));
   camera.position.y = 5;
   camera.position.z = 50;
   camera.position.x = 50;
+  // scene.add(new THREE.CameraHelper(camera));
 
   // lights
   scene.add(new THREE.AmbientLight(0xffffff));
@@ -62,9 +74,69 @@ function init() {
   scene.add(directionalLight);
 
   // controls
-  controls = new FirstPersonControls(camera, renderer.domElement);
-  controls.lookSpeed = 0.4;
-  controls.movementSpeed = 10;
+  controls = new PointerLockControls(camera, document.body);
+  scene.add( controls.getObject() );
+  const onKeyDown = function (event) {
+    switch ( event.code ) {
+      case 'ArrowUp':
+      case 'KeyW':
+        moveForward = true;
+        break;
+      case 'ArrowLeft':
+      case 'KeyA':
+        moveLeft = true;
+        break;
+      case 'ArrowDown':
+      case 'KeyS':
+        moveBackward = true;
+        break;
+      case 'ArrowRight':
+      case 'KeyD':
+        moveRight = true;
+        break;
+      case 'Space':
+        if (canJump === true) velocity.y += 150;
+        canJump = false;
+        break;
+    }
+  };
+  const onKeyUp = function (event) {
+    switch ( event.code ) {
+      case 'ArrowUp':
+      case 'KeyW':
+        moveForward = false;
+        break;
+      case 'ArrowLeft':
+      case 'KeyA':
+        moveLeft = false;
+        break;
+      case 'ArrowDown':
+      case 'KeyS':
+        moveBackward = false;
+        break;
+      case 'ArrowRight':
+      case 'KeyD':
+        moveRight = false;
+        break;
+    }
+  };
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
+
+  // basic instructions screen
+  const blocker = document.getElementById('blocker');
+  const instructions = document.getElementById('instructions');
+  instructions.addEventListener('click', function () {
+    controls.lock();
+  });
+  controls.addEventListener('lock', function () {
+    instructions.style.display = 'none';
+    blocker.style.display = 'none';
+  });
+  controls.addEventListener('unlock', function () {
+    blocker.style.display = 'block';
+    instructions.style.display = '';
+  });
 
   // window resize
   window.addEventListener('resize', () => {
@@ -89,38 +161,17 @@ function init() {
   };
 
   // Cannon.js variables
-  world = new CANNON.World();
-  world.gravity.set(0, gravity, 0);
-  world.broadphase = new CANNON.NaiveBroadphase();
-}
-
-function createCube(i, j, k, side, texture, transparent) {
-  // TODO: create cube with physics
-  const cube = new CANNON.Box(new CANNON.Vec3(side, side, side));
-  const cubeBody = new CANNON.Body({ mass: 0, position: new CANNON.Vec3(i + side/2, j + side/2, k + side/2) });
-  cubeBody.addShape(cube);
-  world.addBody(cubeBody);
-
-  const materials = [
-    texture.side,
-    texture.side,
-    texture.top,
-    texture.bottom,
-    texture.side,
-    texture.side,
-  ].map(texture => new THREE.MeshBasicMaterial({ map: texture }));
-  // {map: texture, transparent: true, opacity: transparent ? 0.3 : 1}
-
-  const cubeMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(side, side, side),
-    materials
-  );
-  cubeMesh.position.set(i, j, k);
-  scene.add(cubeMesh);
+  // world = new CANNON.World();
+  // world.gravity.set(0, gravity, 0);
+  // world.broadphase = new CANNON.NaiveBroadphase();
 }
 
 function createInstancedMesh(geometry, cubes, texture_name) {
   // TODO: create instanced mesh with physics
+  // const cube = new CANNON.Box(new CANNON.Vec3(side, side, side));
+  // const cubeBody = new CANNON.Body({ mass: 0, position: new CANNON.Vec3(i + side/2, j + side/2, k + side/2) });
+  // cubeBody.addShape(cube);
+  // world.addBody(cubeBody);
 
   let materials;
   if (texture_name == 'water') {
@@ -144,6 +195,7 @@ function createInstancedMesh(geometry, cubes, texture_name) {
     mesh.setMatrixAt(cube_index, matrix);
   });
   scene.add(mesh);
+  objects.push(mesh);
 }
 
 function createWorld() {
@@ -153,15 +205,12 @@ function createWorld() {
     for (let k = 0; k < planeSize; k += cubeSize) {
       // base floor plane: stone
       state.stone.push(new Cube(i, 0, k))
-
       // use noise to create hills of random height
       const height = Math.floor(noise.perlin2(i/noiseFactorXZ, k/noiseFactorXZ) * noiseFactorY) + noiseFactorAdd;
-
       // build hills of grass cubes
       for (let j = 1; j < height; j++) {
         state.grass.push(new Cube(i, j, k))
       }
-
       // fill bottom of valleys with water
       for (let j = Math.max(height, 1); j < waterLevel; j++) {
         state.water.push(new Cube(i, j, k))
@@ -180,11 +229,48 @@ function animate () {
   // requestAnimationFrame(animate);
 
   // Update physics
-  world.step(1 / 60);
+  // world.step(1 / 60);
 
-  // Update controls
-  const delta = clock.getDelta();
-  controls.update(delta);
+  // Update controls and physics
+  if (controls.isLocked === true) {
+    const delta = clock.getDelta();
+
+    // inertia and gravity
+    velocity.x -= velocity.x * 20.0 * delta;
+    velocity.z -= velocity.z * 20.0 * delta;
+    velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+
+    // stop falling when on ground
+    raycaster.ray.origin.copy(controls.getObject().position);
+    raycaster.ray.origin.y -= 10;
+    const intersections = raycaster.intersectObjects(objects, false);
+    const onObject = intersections.length > 0;
+    if (onObject === true) {
+      velocity.y = Math.max(0, velocity.y);
+      canJump = true;
+    }
+
+    // update movement direction
+    direction.z = Number(moveForward) - Number(moveBackward);
+    direction.x = Number(moveRight) - Number(moveLeft);
+    direction.normalize(); // this ensures consistent movements in all directions
+
+    // update movement speed
+    if (moveForward || moveBackward) velocity.z -= direction.z * 200.0 * delta;
+    if (moveLeft || moveRight)       velocity.x -= direction.x * 200.0 * delta;
+
+    // move
+    controls.moveRight(-velocity.x * delta);
+    controls.moveForward(-velocity.z * delta);
+    controls.getObject().position.y += (velocity.y * delta);
+
+    // prevent falling through the base floor
+    if (controls.getObject().position.y < 1) {
+      velocity.y = 0;
+      controls.getObject().position.y = 1;
+      canJump = true;
+    }
+  }
 
   // Render scene
   stats.update();
