@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import Stats from 'three/examples/jsm/libs/stats.module';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { FirstPersonControls } from 'three/examples/jsm/controls/FirstPersonControls';
 import { Noise } from 'noisejs';
 
 import { Cube } from './cube';
@@ -9,7 +9,8 @@ import { Cube } from './cube';
 let scene: THREE.Scene;
 let renderer: THREE.WebGLRenderer;
 let camera: THREE.PerspectiveCamera;
-let controls: OrbitControls;
+let clock: THREE.Clock;
+let controls: FirstPersonControls;
 let stats: Stats;
 let world: CANNON.World;
 let textures: any = {};
@@ -46,11 +47,14 @@ function init() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x7cd1e9); // clear sky blue
 
+  clock = new THREE.Clock();
+
   // camera
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   scene.add(new THREE.CameraHelper(camera));
   camera.position.y = 5;
-  camera.position.z = 5;
+  camera.position.z = 50;
+  camera.position.x = 50;
 
   // lights
   scene.add(new THREE.AmbientLight(0xffffff));
@@ -59,11 +63,9 @@ function init() {
   scene.add(directionalLight);
 
   // controls
-  controls = new OrbitControls(camera, renderer.domElement);
-  // controls.enableDamping = true; // an animation loop is required for this to work
-  controls.screenSpacePanning = false;
-  controls.listenToKeyEvents( window );
-  controls.keys = { UP: 'KeyW', LEFT: 'KeyA', BOTTOM: 'KeyS', RIGHT: 'KeyD' };
+  controls = new FirstPersonControls(camera, renderer.domElement);
+  controls.lookSpeed = 0.4;
+  controls.movementSpeed = 10;
 
   // window resize
   window.addEventListener('resize', () => {
@@ -188,7 +190,8 @@ function animate () {
   world.step(1 / 60);
 
   // Update controls
-  controls.update();
+  const delta = clock.getDelta();
+  controls.update(delta);
 
   // Render scene
   stats.update();
