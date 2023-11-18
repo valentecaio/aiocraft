@@ -14,14 +14,13 @@ let controls: FirstPersonControls;
 let stats: Stats;
 let world: CANNON.World;
 let textures: any = {};
-let noise: Noise;
 
 // global settings
 const cubeSize = 1;
 const gravity = -9.8;
 
 // terrain generation settings
-const planeSize = 50;      // 50 x 50 cubes in the plane
+const planeSize = 50;      // 50 x 50 cubes in the base plane XZ
 const noiseFactorY = 7;    // factor of terrain noise in Y direction. Bigger values create higher mountains
 const noiseFactorXZ = 20;  // factor of terrain noise in X and Z directions. Bigger values create more variation in terrain
 const noiseFactorAdd = 5;  // bigger values mean higher terrain
@@ -87,11 +86,6 @@ function init() {
       side:   textureLoader.load('textures/v1/stone_dark.png'),
       bottom: textureLoader.load('textures/v1/stone_dark.png'),
     },
-    water: {
-      top:    textureLoader.load('textures/v1/water.png'),
-      side:   textureLoader.load('textures/v1/water.png'),
-      bottom: textureLoader.load('textures/v1/water.png'),
-    },
   };
 
   // Cannon.js variables
@@ -125,24 +119,23 @@ function createCube(i, j, k, side, texture, transparent) {
   scene.add(cubeMesh);
 }
 
-function createInstancedMesh(geometry, cubes, texture, transparent = false) {
+function createInstancedMesh(geometry, cubes, texture_name) {
   // TODO: create instanced mesh with physics
 
-  // create materials for each face of the cubes
-  const materials = [
-    texture.side,
-    texture.side,
-    texture.top,
-    texture.bottom,
-    texture.side,
-    texture.side,
-  ].map(text => {
-    if (transparent) {
-      return new THREE.MeshBasicMaterial({ map: text, transparent: true, opacity: 0.3 })
-    } else {
-      return new THREE.MeshBasicMaterial({ map: text })
-    }
-  });
+  let materials;
+  if (texture_name == 'water') {
+    materials = new THREE.MeshBasicMaterial({ color: 0x1ca3ec, transparent: true, opacity: 0.2 })
+  } else {
+    // create materials for each face of the cubes
+    materials = [
+      textures[texture_name].side,
+      textures[texture_name].side,
+      textures[texture_name].top,
+      textures[texture_name].bottom,
+      textures[texture_name].side,
+      textures[texture_name].side,
+    ].map( text => new THREE.MeshBasicMaterial({ map: text }) );
+  }
   const mesh = new THREE.InstancedMesh(geometry, materials, cubes.length);
 
   // set position of each cube
@@ -154,32 +147,32 @@ function createInstancedMesh(geometry, cubes, texture, transparent = false) {
 }
 
 function createWorld() {
-  noise = new Noise(Date.now() % 65536);
+  const noise = new Noise(Date.now() % 65536);
 
   for (let i = 0; i < planeSize; i += cubeSize) {
-    for (let j = 0; j < planeSize; j += cubeSize) {
-      // base floor: stone
-      state.stone.push(new Cube(i, 0, j))
+    for (let k = 0; k < planeSize; k += cubeSize) {
+      // base floor plane: stone
+      state.stone.push(new Cube(i, 0, k))
 
-      // use noise to create random height of cubes
-      const height = Math.floor(noise.perlin2(i/noiseFactorXZ, j/noiseFactorXZ) * noiseFactorY) + noiseFactorAdd;
+      // use noise to create hills of random height
+      const height = Math.floor(noise.perlin2(i/noiseFactorXZ, k/noiseFactorXZ) * noiseFactorY) + noiseFactorAdd;
 
-      // create grass cubes
-      for (let k = 1; k < height; k++) {
-        state.grass.push(new Cube(i, k, j))
+      // build hills of grass cubes
+      for (let j = 1; j < height; j++) {
+        state.grass.push(new Cube(i, j, k))
       }
 
-      // fill bottom with water
-      for (let k = Math.max(height, 1); k < waterLevel; k++) {
-        state.water.push(new Cube(i, k, j))
+      // fill bottom of valleys with water
+      for (let j = Math.max(height, 1); j < waterLevel; j++) {
+        state.water.push(new Cube(i, j, k))
       }
     }
   }
 
   const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-  createInstancedMesh(geometry, state.stone, textures.stone);
-  createInstancedMesh(geometry, state.grass, textures.grass);
-  createInstancedMesh(geometry, state.water, textures.water, true);
+  createInstancedMesh(geometry, state.stone, 'stone');
+  createInstancedMesh(geometry, state.grass, 'grass');
+  createInstancedMesh(geometry, state.water, 'water');
 }
 
 // animation loop
