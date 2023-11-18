@@ -4,6 +4,8 @@ import Stats from 'three/examples/jsm/libs/stats.module';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { Noise } from 'noisejs';
 
+import { Cube } from './cube';
+
 let scene: THREE.Scene;
 let renderer: THREE.WebGLRenderer;
 let camera: THREE.PerspectiveCamera;
@@ -13,6 +15,13 @@ let world: CANNON.World;
 let textures: any = {};
 let noise: Noise;
 
+// global game state
+let state = {
+  grass: [],
+  stone: [],
+  water: [],
+};
+
 function init() {
   // Three.js variables
   stats = new Stats();
@@ -20,6 +29,7 @@ function init() {
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setAnimationLoop(animate);
   document.body.appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
@@ -78,6 +88,7 @@ function init() {
 }
 
 function createCube(i, j, k, side, texture, transparent) {
+  // TODO: create cube with physics
   const cube = new CANNON.Box(new CANNON.Vec3(side, side, side));
   const cubeBody = new CANNON.Body({ mass: 0, position: new CANNON.Vec3(i + side/2, j + side/2, k + side/2) });
   cubeBody.addShape(cube);
@@ -101,39 +112,69 @@ function createCube(i, j, k, side, texture, transparent) {
   scene.add(cubeMesh);
 }
 
+function createInstancedMesh(geometry, cubes, texture, transparent = false) {
+  // TODO: create instanced mesh with physics
+
+  // create materials for each face of the cubes
+  const materials = [
+    texture.side,
+    texture.side,
+    texture.top,
+    texture.bottom,
+    texture.side,
+    texture.side,
+  ].map(text => {
+    if (transparent) {
+      return new THREE.MeshBasicMaterial({ map: text, transparent: true, opacity: 0.3 })
+    } else {
+      return new THREE.MeshBasicMaterial({ map: text })
+    }
+  });
+  const mesh = new THREE.InstancedMesh(geometry, materials, cubes.length);
+
+  // set position of each cube
+  cubes.forEach((cube, cube_index) => {
+    const matrix = new THREE.Matrix4().setPosition(cube.x, cube.y, cube.z);
+    mesh.setMatrixAt(cube_index, matrix);
+  });
+  scene.add(mesh);
+}
+
 function createWorld() {
-  const planeSize = 20;
+  const planeSize = 50;
   const cubeSize = 1;
   noise = new Noise(Date.now() % 65536);
 
   for (let i = 0; i < planeSize; i += cubeSize) {
     for (let j = 0; j < planeSize; j += cubeSize) {
-      // base floor: strong stone
-      createCube(i, 0, j, cubeSize, textures['stone'], false)
+      // base floor: stone
+      state.stone.push(new Cube(i, 0, j))
 
       // use noise to create random height of cubes
       const height = Math.floor(noise.perlin2(i / 10, j / 10) * 10) + 5;
 
-      // create grass/stone cubes
+      // create grass cubes
       for (let k = 1; k < height; k++) {
-        createCube(i, k, j, cubeSize, textures['grass'], false)
+        state.grass.push(new Cube(i, k, j))
       }
 
       // fill bottom with water
       let waterHeight = 3;
       for (let k = Math.max(height, 1); k < waterHeight; k++) {
-        createCube(i, k, j, cubeSize, textures['water'], true)
+        state.water.push(new Cube(i, k, j))
       }
     }
   }
+
+  const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+  createInstancedMesh(geometry, state.stone, textures.stone);
+  createInstancedMesh(geometry, state.grass, textures.grass);
+  createInstancedMesh(geometry, state.water, textures.water, true);
 }
 
-init();
-createWorld();
-
 // Set up animation loop
-const animate = () => {
-  requestAnimationFrame(animate);
+function animate () {
+  // requestAnimationFrame(animate);
 
   // Update physics
   world.step(1 / 60);
@@ -146,4 +187,5 @@ const animate = () => {
   renderer.render(scene, camera);
 };
 
-animate();
+init();
+createWorld();
