@@ -33,13 +33,13 @@ let state = {
   stone: [],
   water: [],
 };
-const objects = [];
+let meshGrass: THREE.Mesh;
 
 let moveForward = false;
 let moveBackward = false;
 let moveLeft = false;
 let moveRight = false;
-let canJump = false;
+let jumping = false;
 
 const velocity = new THREE.Vector3();
 const direction = new THREE.Vector3();
@@ -95,9 +95,10 @@ function init() {
         moveRight = true;
         break;
       case 'Space':
-        if (canJump === true) velocity.y += 150;
-        canJump = false;
-        break;
+        if (jumping === false)
+          jumping = true;
+          velocity.y += 150;
+          break
     }
   };
   const onKeyUp = function (event) {
@@ -137,6 +138,11 @@ function init() {
     blocker.style.display = 'block';
     instructions.style.display = '';
   });
+
+  // starting position of the player
+  controls.getObject().position.x = planeSize / 2;
+  controls.getObject().position.z = planeSize / 2;
+  controls.getObject().position.y = 10;
 
   // window resize
   window.addEventListener('resize', () => {
@@ -195,33 +201,32 @@ function createInstancedMesh(geometry, cubes, texture_name) {
     mesh.setMatrixAt(cube_index, matrix);
   });
   scene.add(mesh);
-  objects.push(mesh);
+  return mesh
 }
 
 function createWorld() {
   const noise = new Noise(Date.now() % 65536);
 
-  for (let i = 0; i < planeSize; i += cubeSize) {
-    for (let k = 0; k < planeSize; k += cubeSize) {
+  for (let i = 0; i < planeSize; i++) {
+    for (let k = 0; k < planeSize; k++) {
       // base floor plane: stone
-      state.stone.push(new Cube(i, 0, k))
+      state.stone.push(new Cube(i*cubeSize, 0, k*cubeSize))
       // use noise to create hills of random height
       const height = Math.floor(noise.perlin2(i/noiseFactorXZ, k/noiseFactorXZ) * noiseFactorY) + noiseFactorAdd;
       // build hills of grass cubes
       for (let j = 1; j < height; j++) {
-        state.grass.push(new Cube(i, j, k))
+        state.grass.push(new Cube(i*cubeSize, j*cubeSize, k*cubeSize))
       }
       // fill bottom of valleys with water
       for (let j = Math.max(height, 1); j < waterLevel; j++) {
-        state.water.push(new Cube(i, j, k))
+        state.water.push(new Cube(i*cubeSize, j*cubeSize, k*cubeSize))
       }
     }
   }
-
   const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
   createInstancedMesh(geometry, state.stone, 'stone');
-  createInstancedMesh(geometry, state.grass, 'grass');
   createInstancedMesh(geometry, state.water, 'water');
+  meshGrass = createInstancedMesh(geometry, state.grass, 'grass');
 }
 
 // animation loop
@@ -233,6 +238,11 @@ function animate () {
 
   // Update controls and physics
   if (controls.isLocked === true) {
+    // update movement direction
+    direction.z = Number(moveForward) - Number(moveBackward);
+    direction.x = Number(moveRight) - Number(moveLeft);
+    direction.normalize(); // this ensures consistent movements in all directions
+
     const delta = clock.getDelta();
 
     // inertia and gravity
@@ -240,24 +250,21 @@ function animate () {
     velocity.z -= velocity.z * 20.0 * delta;
     velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
 
+    // update movement speed
+    if (moveForward || moveBackward) velocity.z -= direction.z * 100.0 * delta;
+    if (moveLeft || moveRight)       velocity.x -= direction.x * 100.0 * delta;
+
     // stop falling when on ground
     raycaster.ray.origin.copy(controls.getObject().position);
-    raycaster.ray.origin.y -= 10;
-    const intersections = raycaster.intersectObjects(objects, false);
-    const onObject = intersections.length > 0;
-    if (onObject === true) {
-      velocity.y = Math.max(0, velocity.y);
-      canJump = true;
+    const intersections = raycaster.intersectObject(meshGrass, false);
+    if (intersections.length > 0) {
+      // const instanceId = intersections[0].instanceId;
+      if (controls.getObject().position.y - intersections[0].point.y < 1.3) {
+        // max() will make it stop falling but not from jumping
+        velocity.y = Math.max(0, velocity.y);
+        jumping = false;
+      }
     }
-
-    // update movement direction
-    direction.z = Number(moveForward) - Number(moveBackward);
-    direction.x = Number(moveRight) - Number(moveLeft);
-    direction.normalize(); // this ensures consistent movements in all directions
-
-    // update movement speed
-    if (moveForward || moveBackward) velocity.z -= direction.z * 200.0 * delta;
-    if (moveLeft || moveRight)       velocity.x -= direction.x * 200.0 * delta;
 
     // move
     controls.moveRight(-velocity.x * delta);
@@ -268,7 +275,7 @@ function animate () {
     if (controls.getObject().position.y < 1) {
       velocity.y = 0;
       controls.getObject().position.y = 1;
-      canJump = true;
+      jumping = false;
     }
   }
 
