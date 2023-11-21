@@ -101,10 +101,10 @@ function init() {
         moveRight = true;
         break;
       case 'Space':
-        if (jumping === false && velocity.y == 0)
-          jumping = true;
-          velocity.y += 350;
-          break
+        if (jumping) return;
+        jumping = true;
+        velocity.y = 350;
+        break
     }
   };
   const onKeyUp = function (event) {
@@ -264,13 +264,18 @@ function animate () {
     if (moveForward || moveBackward) velocity.z -= direction.z * 100.0 * delta * cubeSize;
     if (moveLeft || moveRight)       velocity.x -= direction.x * 100.0 * delta * cubeSize;
 
-    // stop falling when on ground
+    // stop falling when on ground: base plane (stones)
+    if (controls.getObject().position.y < 1.5*cubeSize) {
+      // max() will stop falling but wont stop jumping
+      velocity.y = Math.max(0, velocity.y);
+      jumping = false;
+    }
+
+    // stop falling when on ground: grass cubes
     raycaster.ray.origin.copy(controls.getObject().position);
     const intersections = raycaster.intersectObject(meshes.grass, false);
     if (intersections.length > 0) {
-      // const instanceId = intersections[0].instanceId;
       if (controls.getObject().position.y - intersections[0].point.y < cubeSize) {
-        // max() will make it stop falling but not from jumping
         velocity.y = Math.max(0, velocity.y);
         jumping = false;
       }
@@ -280,13 +285,6 @@ function animate () {
     controls.moveRight(-velocity.x * delta);
     controls.moveForward(-velocity.z * delta);
     controls.getObject().position.y += (velocity.y * delta);
-
-    // prevent falling through the base floor
-    if (controls.getObject().position.y < cubeSize) {
-      velocity.y = 0;
-      controls.getObject().position.y = 1;
-      jumping = false;
-    }
   }
 
   // Render scene
