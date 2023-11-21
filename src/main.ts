@@ -9,7 +9,8 @@ import { Cube } from './cube';
 let scene: THREE.Scene;
 let renderer: THREE.WebGLRenderer;
 let camera: THREE.PerspectiveCamera;
-let raycaster: THREE.Raycaster;
+let raycasterFloor: THREE.Raycaster;
+let raycasterMouse: THREE.Raycaster;
 let clock: THREE.Clock;
 let controls: PointerLockControls;
 let stats: Stats;
@@ -48,6 +49,67 @@ let jumping = false;
 const velocity = new THREE.Vector3();
 const direction = new THREE.Vector3();
 
+// move and jump
+function onKeyDown(event) {
+  if (controls.isLocked === false) return;
+  switch (event.code) {
+    case 'ArrowUp':
+    case 'KeyW':
+      moveForward = true;
+      break;
+    case 'ArrowLeft':
+    case 'KeyA':
+      moveLeft = true;
+      break;
+    case 'ArrowDown':
+    case 'KeyS':
+      moveBackward = true;
+      break;
+    case 'ArrowRight':
+    case 'KeyD':
+      moveRight = true;
+      break;
+    case 'Space':
+      if (jumping) return;
+      jumping = true;
+      velocity.y = 350;
+      break
+  }
+};
+
+function onKeyUp(event) {
+  if (controls.isLocked === false) return;
+  switch (event.code) {
+    case 'ArrowUp':
+    case 'KeyW':
+      moveForward = false;
+      break;
+    case 'ArrowLeft':
+    case 'KeyA':
+      moveLeft = false;
+      break;
+    case 'ArrowDown':
+    case 'KeyS':
+      moveBackward = false;
+      break;
+    case 'ArrowRight':
+    case 'KeyD':
+      moveRight = false;
+      break;
+  }
+};
+
+// on left click, cast a ray and remove the cube that was hit
+function onClick(event) {
+  if (controls.isLocked === false) return;
+  event.preventDefault();
+  // (0,0) is the center of the screen
+  raycasterMouse.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const intersection = raycasterMouse.intersectObject(meshes.grass);
+  if (intersection.length > 0) {
+    deleteInstanceFromMesh(meshes.grass, intersection[0].instanceId);
+  }
+};
 
 
 function init() {
@@ -64,7 +126,8 @@ function init() {
   scene.background = new THREE.Color(0x7cd1e9); // clear sky blue
 
   clock = new THREE.Clock();
-  raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 10);
+  raycasterFloor = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 10);
+  raycasterMouse = new THREE.Raycaster();
 
   // camera
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -81,54 +144,10 @@ function init() {
 
   // controls
   controls = new PointerLockControls(camera, document.body);
-  scene.add( controls.getObject() );
-  const onKeyDown = function (event) {
-    switch ( event.code ) {
-      case 'ArrowUp':
-      case 'KeyW':
-        moveForward = true;
-        break;
-      case 'ArrowLeft':
-      case 'KeyA':
-        moveLeft = true;
-        break;
-      case 'ArrowDown':
-      case 'KeyS':
-        moveBackward = true;
-        break;
-      case 'ArrowRight':
-      case 'KeyD':
-        moveRight = true;
-        break;
-      case 'Space':
-        if (jumping) return;
-        jumping = true;
-        velocity.y = 350;
-        break
-    }
-  };
-  const onKeyUp = function (event) {
-    switch ( event.code ) {
-      case 'ArrowUp':
-      case 'KeyW':
-        moveForward = false;
-        break;
-      case 'ArrowLeft':
-      case 'KeyA':
-        moveLeft = false;
-        break;
-      case 'ArrowDown':
-      case 'KeyS':
-        moveBackward = false;
-        break;
-      case 'ArrowRight':
-      case 'KeyD':
-        moveRight = false;
-        break;
-    }
-  };
+  scene.add(controls.getObject());
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
+  document.addEventListener('click', onClick);
 
   // basic instructions screen
   const blocker = document.getElementById('blocker');
@@ -175,23 +194,22 @@ function init() {
       bottom: textureLoader.load('textures/v1/stone_dark.png'),
     },
   };
+}
 
-  // Cannon.js variables
-  // world = new CANNON.World();
-  // world.gravity.set(0, gravity, 0);
-  // world.broadphase = new CANNON.NaiveBroadphase();
+function deleteInstanceFromMesh(instancedMesh, instanceId) {
+  for (let i = instanceId; i < instancedMesh.count - 1; i++) {
+    const matrix = new THREE.Matrix4();
+    instancedMesh.getMatrixAt(i + 1, matrix);
+    instancedMesh.setMatrixAt(i, matrix);
+  }
+  instancedMesh.count--;
+  instancedMesh.instanceMatrix.needsUpdate = true;
 }
 
 function createInstancedMesh(geometry, cubes, texture_name) {
-  // TODO: create instanced mesh with physics
-  // const cube = new CANNON.Box(new CANNON.Vec3(side, side, side));
-  // const cubeBody = new CANNON.Body({ mass: 0, position: new CANNON.Vec3(i + side/2, j + side/2, k + side/2) });
-  // cubeBody.addShape(cube);
-  // world.addBody(cubeBody);
-
   let materials;
   if (texture_name == 'water') {
-    materials = new THREE.MeshBasicMaterial({ color: 0x1ca3ec, transparent: true, opacity: 0.2 })
+    materials = new THREE.MeshBasicMaterial({color: 0x1ca3ec, transparent: true, opacity: 0.2})
   } else {
     // create materials for each face of the cubes
     materials = [
@@ -201,7 +219,7 @@ function createInstancedMesh(geometry, cubes, texture_name) {
       textures[texture_name].bottom,
       textures[texture_name].side,
       textures[texture_name].side,
-    ].map( text => new THREE.MeshBasicMaterial({ map: text }) );
+    ].map(text => new THREE.MeshBasicMaterial({map: text}));
   }
   const mesh = new THREE.InstancedMesh(geometry, materials, cubes.length);
 
@@ -272,8 +290,8 @@ function animate () {
     }
 
     // stop falling when on ground: grass cubes
-    raycaster.ray.origin.copy(controls.getObject().position);
-    const intersections = raycaster.intersectObject(meshes.grass, false);
+    raycasterFloor.ray.origin.copy(controls.getObject().position);
+    const intersections = raycasterFloor.intersectObject(meshes.grass, false);
     if (intersections.length > 0) {
       if (controls.getObject().position.y - intersections[0].point.y < cubeSize) {
         velocity.y = Math.max(0, velocity.y);
