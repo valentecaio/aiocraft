@@ -17,32 +17,38 @@ let stats: Stats;
 let textures: any = {};
 
 // global settings
-const cubeSize = 1;
-const gravity = -9.8;
+const cubeSize = 10;
+const gravity = 9.8;
 
 // terrain generation settings
-const planeSize = 50;      // 50 x 50 cubes in the base plane XZ
+const planeSize = 50;      // 50 x 50 cubes in the base XZ plane
 const noiseFactorY = 7;    // factor of terrain noise in Y direction. Bigger values create higher mountains
 const noiseFactorXZ = 20;  // factor of terrain noise in X and Z directions. Bigger values create more variation in terrain
 const noiseFactorAdd = 5;  // bigger values mean higher terrain
-const waterLevel = 3       // empty space below this level is water
+const waterLevel = 3       // empty spaces below this Y are water
 
-// global game state
-let state = {
+// terrain state
+let cubes = {
   grass: [],
   stone: [],
   water: [],
 };
-let meshGrass: THREE.Mesh;
+let meshes = {
+  grass: THREE.InstancedMesh,
+  stone: THREE.InstancedMesh,
+  water: THREE.InstancedMesh,
+};
 
+// movement
 let moveForward = false;
 let moveBackward = false;
 let moveLeft = false;
 let moveRight = false;
 let jumping = false;
-
 const velocity = new THREE.Vector3();
 const direction = new THREE.Vector3();
+
+
 
 function init() {
   // Three.js variables
@@ -95,9 +101,9 @@ function init() {
         moveRight = true;
         break;
       case 'Space':
-        if (jumping === false)
+        if (jumping === false && velocity.y == 0)
           jumping = true;
-          velocity.y += 150;
+          velocity.y += 350;
           break
     }
   };
@@ -127,22 +133,26 @@ function init() {
   // basic instructions screen
   const blocker = document.getElementById('blocker');
   const instructions = document.getElementById('instructions');
+  const aimpointer = document.getElementById('aimpointer');
+  aimpointer.style.display = 'none';
   instructions.addEventListener('click', function () {
     controls.lock();
   });
   controls.addEventListener('lock', function () {
     instructions.style.display = 'none';
     blocker.style.display = 'none';
+    aimpointer.style.display = '';
   });
   controls.addEventListener('unlock', function () {
-    blocker.style.display = 'block';
     instructions.style.display = '';
+    blocker.style.display = 'block';
+    aimpointer.style.display = 'none';
   });
 
-  // starting position of the player
-  controls.getObject().position.x = planeSize / 2;
-  controls.getObject().position.z = planeSize / 2;
-  controls.getObject().position.y = 10;
+  // initial position of the player
+  controls.getObject().position.x = cubeSize * planeSize / 2;
+  controls.getObject().position.z = cubeSize * planeSize / 2;
+  controls.getObject().position.y = cubeSize * 10;
 
   // window resize
   window.addEventListener('resize', () => {
@@ -210,23 +220,23 @@ function createWorld() {
   for (let i = 0; i < planeSize; i++) {
     for (let k = 0; k < planeSize; k++) {
       // base floor plane: stone
-      state.stone.push(new Cube(i*cubeSize, 0, k*cubeSize))
+      cubes.stone.push(new Cube(i*cubeSize, 0, k*cubeSize));
       // use noise to create hills of random height
       const height = Math.floor(noise.perlin2(i/noiseFactorXZ, k/noiseFactorXZ) * noiseFactorY) + noiseFactorAdd;
       // build hills of grass cubes
       for (let j = 1; j < height; j++) {
-        state.grass.push(new Cube(i*cubeSize, j*cubeSize, k*cubeSize))
+        cubes.grass.push(new Cube(i*cubeSize, j*cubeSize, k*cubeSize));
       }
       // fill bottom of valleys with water
       for (let j = Math.max(height, 1); j < waterLevel; j++) {
-        state.water.push(new Cube(i*cubeSize, j*cubeSize, k*cubeSize))
+        cubes.water.push(new Cube(i*cubeSize, j*cubeSize, k*cubeSize));
       }
     }
   }
   const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-  createInstancedMesh(geometry, state.stone, 'stone');
-  createInstancedMesh(geometry, state.water, 'water');
-  meshGrass = createInstancedMesh(geometry, state.grass, 'grass');
+  meshes.stone = createInstancedMesh(geometry, cubes.stone, 'stone');
+  meshes.water = createInstancedMesh(geometry, cubes.water, 'water');
+  meshes.grass = createInstancedMesh(geometry, cubes.grass, 'grass');
 }
 
 // animation loop
@@ -248,18 +258,18 @@ function animate () {
     // inertia and gravity
     velocity.x -= velocity.x * 20.0 * delta;
     velocity.z -= velocity.z * 20.0 * delta;
-    velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+    velocity.y -= gravity * 100.0 * delta; // 100.0 = mass
 
     // update movement speed
-    if (moveForward || moveBackward) velocity.z -= direction.z * 100.0 * delta;
-    if (moveLeft || moveRight)       velocity.x -= direction.x * 100.0 * delta;
+    if (moveForward || moveBackward) velocity.z -= direction.z * 100.0 * delta * cubeSize;
+    if (moveLeft || moveRight)       velocity.x -= direction.x * 100.0 * delta * cubeSize;
 
     // stop falling when on ground
     raycaster.ray.origin.copy(controls.getObject().position);
-    const intersections = raycaster.intersectObject(meshGrass, false);
+    const intersections = raycaster.intersectObject(meshes.grass, false);
     if (intersections.length > 0) {
       // const instanceId = intersections[0].instanceId;
-      if (controls.getObject().position.y - intersections[0].point.y < 1.3) {
+      if (controls.getObject().position.y - intersections[0].point.y < cubeSize) {
         // max() will make it stop falling but not from jumping
         velocity.y = Math.max(0, velocity.y);
         jumping = false;
@@ -272,7 +282,7 @@ function animate () {
     controls.getObject().position.y += (velocity.y * delta);
 
     // prevent falling through the base floor
-    if (controls.getObject().position.y < 1) {
+    if (controls.getObject().position.y < cubeSize) {
       velocity.y = 0;
       controls.getObject().position.y = 1;
       jumping = false;

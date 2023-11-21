@@ -8,11 +8,32 @@ body {
   overscroll-behavior: none;
 }
 
+#wrapper{
+  position: relative;
+}
+
+#aimpointer {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  text-align: center;
+  font-size: 14px;
+
+  position: absolute;
+}
+
 #blocker {
   position: absolute;
   width: 100%;
   height: 100%;
   background-color: rgba(0,0,0,0.5);
+
+  position: absolute;
 }
 
 #instructions {
