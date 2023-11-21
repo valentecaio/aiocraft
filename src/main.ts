@@ -17,12 +17,15 @@ let stats: Stats;
 // let world: CANNON.World;
 let textures: any = {};
 
-// global settings
-const cubeSize = 10;
-const gravity = 9.8;
+// global settings and hacks
+const cubeSize = 10;     // scale of cubes
+const gravity = 9.8;     // how fast the player falls
+const jumpFactor = 350;  // how high the player jumps
+const speed = 300;       // how fast the player moves
+const fly = true;       // whether the player can fly
 
 // terrain generation settings
-const planeSize = 50;      // 50 x 50 cubes in the base XZ plane
+const planeSize = 90;     // size of the base XZ plane
 const noiseFactorY = 7;    // factor of terrain noise in Y direction. Bigger values create higher mountains
 const noiseFactorXZ = 20;  // factor of terrain noise in X and Z directions. Bigger values create more variation in terrain
 const noiseFactorAdd = 5;  // bigger values mean higher terrain
@@ -72,7 +75,7 @@ function onKeyDown(event) {
     case 'Space':
       if (jumping) return;
       jumping = true;
-      velocity.y = 350;
+      velocity.y = jumpFactor;
       break
   }
 };
@@ -130,7 +133,7 @@ function init() {
   raycasterMouse = new THREE.Raycaster();
 
   // camera
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 700);
   camera.position.y = 5;
   camera.position.z = 50;
   camera.position.x = 50;
@@ -171,7 +174,7 @@ function init() {
   // initial position of the player
   controls.getObject().position.x = cubeSize * planeSize / 2;
   controls.getObject().position.z = cubeSize * planeSize / 2;
-  controls.getObject().position.y = cubeSize * 10;
+  controls.getObject().position.y = cubeSize * 15;
 
   // window resize
   window.addEventListener('resize', () => {
@@ -279,8 +282,8 @@ function animate () {
     velocity.y -= gravity * 100.0 * delta; // 100.0 = mass
 
     // update movement speed
-    if (moveForward || moveBackward) velocity.z -= direction.z * 100.0 * delta * cubeSize;
-    if (moveLeft || moveRight)       velocity.x -= direction.x * 100.0 * delta * cubeSize;
+    if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta * cubeSize;
+    if (moveLeft || moveRight)       velocity.x -= direction.x * speed * delta * cubeSize;
 
     // stop falling when on ground: base plane (stones)
     if (controls.getObject().position.y < 1.5*cubeSize) {
@@ -297,6 +300,11 @@ function animate () {
         velocity.y = Math.max(0, velocity.y);
         jumping = false;
       }
+    }
+
+    // fly hack
+    if (fly) {
+      velocity.y = Math.max(0, velocity.y);
     }
 
     // move
