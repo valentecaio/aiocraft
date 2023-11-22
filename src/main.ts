@@ -21,15 +21,19 @@ let textures: any = {};
 const cubeSize = 10;     // scale of cubes
 const gravity = 9.8;     // how fast the player falls
 const jumpFactor = 350;  // how high the player jumps
-const speed = 300;       // how fast the player moves
-const fly = true;       // whether the player can fly
+let speed = 100;         // how fast the player moves
+let fly = false;         // whether the player can fly
 
 // terrain generation settings
-const planeSize = 90;     // size of the base XZ plane
-const noiseFactorY = 7;    // factor of terrain noise in Y direction. Bigger values create higher mountains
+const planeSize = 10;     // size of the base XZ plane
+const noiseFactorY = 70;    // factor of terrain noise in Y direction. Bigger values create higher mountains
 const noiseFactorXZ = 20;  // factor of terrain noise in X and Z directions. Bigger values create more variation in terrain
 const noiseFactorAdd = 5;  // bigger values mean higher terrain
 const waterLevel = 3       // empty spaces below this Y are water
+
+// TODO: terrain visualization
+let meshCenter: THREE.Vector2;
+const meshRadius = 50;
 
 // terrain state
 let cubes = {
@@ -51,27 +55,16 @@ let moveRight = false;
 let jumping = false;
 const velocity = new THREE.Vector3();
 const direction = new THREE.Vector3();
+let position: THREE.Vector3; // just a pointer to controls.getObject().position
 
 // move and jump
 function onKeyDown(event) {
   if (controls.isLocked === false) return;
   switch (event.code) {
-    case 'ArrowUp':
-    case 'KeyW':
-      moveForward = true;
-      break;
-    case 'ArrowLeft':
-    case 'KeyA':
-      moveLeft = true;
-      break;
-    case 'ArrowDown':
-    case 'KeyS':
-      moveBackward = true;
-      break;
-    case 'ArrowRight':
-    case 'KeyD':
-      moveRight = true;
-      break;
+    case 'KeyW': moveForward = true; break;
+    case 'KeyA': moveLeft = true; break;
+    case 'KeyS': moveBackward = true; break;
+    case 'KeyD': moveRight = true; break;
     case 'Space':
       if (jumping) return;
       jumping = true;
@@ -83,22 +76,18 @@ function onKeyDown(event) {
 function onKeyUp(event) {
   if (controls.isLocked === false) return;
   switch (event.code) {
-    case 'ArrowUp':
-    case 'KeyW':
-      moveForward = false;
-      break;
-    case 'ArrowLeft':
-    case 'KeyA':
-      moveLeft = false;
-      break;
-    case 'ArrowDown':
-    case 'KeyS':
-      moveBackward = false;
-      break;
-    case 'ArrowRight':
-    case 'KeyD':
-      moveRight = false;
-      break;
+    // game controls
+    case 'KeyW': moveForward = false; break;
+    case 'KeyA': moveLeft = false; break;
+    case 'KeyS': moveBackward = false; break;
+    case 'KeyD': moveRight = false; break;
+
+    // hacks
+    case 'KeyF':       fly = !fly; break;
+    case 'ArrowUp':    position.y += 50; break;
+    case 'ArrowDown':  position.y -= 50; break;
+    case 'ArrowLeft':  speed -= 50; break;
+    case 'ArrowRight': speed += 50; break;
   }
 };
 
@@ -133,7 +122,7 @@ function init() {
   raycasterMouse = new THREE.Raycaster();
 
   // camera
-  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 700);
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1500);
   camera.position.y = 5;
   camera.position.z = 50;
   camera.position.x = 50;
@@ -147,6 +136,7 @@ function init() {
 
   // controls
   controls = new PointerLockControls(camera, document.body);
+  position = controls.getObject().position;
   scene.add(controls.getObject());
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
@@ -172,9 +162,9 @@ function init() {
   });
 
   // initial position of the player
-  controls.getObject().position.x = cubeSize * planeSize / 2;
-  controls.getObject().position.z = cubeSize * planeSize / 2;
-  controls.getObject().position.y = cubeSize * 15;
+  position.x = cubeSize * planeSize / 2;
+  position.z = cubeSize * planeSize / 2;
+  position.y = cubeSize * 15;
 
   // window resize
   window.addEventListener('resize', () => {
@@ -286,17 +276,17 @@ function animate () {
     if (moveLeft || moveRight)       velocity.x -= direction.x * speed * delta * cubeSize;
 
     // stop falling when on ground: base plane (stones)
-    if (controls.getObject().position.y < 1.5*cubeSize) {
+    if (position.y < 1.5*cubeSize) {
       // max() will stop falling but wont stop jumping
       velocity.y = Math.max(0, velocity.y);
       jumping = false;
     }
 
     // stop falling when on ground: grass cubes
-    raycasterFloor.ray.origin.copy(controls.getObject().position);
+    raycasterFloor.ray.origin.copy(position);
     const intersections = raycasterFloor.intersectObject(meshes.grass, false);
     if (intersections.length > 0) {
-      if (controls.getObject().position.y - intersections[0].point.y < cubeSize) {
+      if (position.y - intersections[0].point.y < cubeSize) {
         velocity.y = Math.max(0, velocity.y);
         jumping = false;
       }
@@ -310,7 +300,7 @@ function animate () {
     // move
     controls.moveRight(-velocity.x * delta);
     controls.moveForward(-velocity.z * delta);
-    controls.getObject().position.y += (velocity.y * delta);
+    position.y += (velocity.y * delta);
   }
 
   // Render scene
