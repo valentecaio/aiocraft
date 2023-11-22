@@ -25,15 +25,17 @@ let speed = 100;         // how fast the player moves
 let fly = false;         // whether the player can fly
 
 // terrain generation settings
-const planeSize = 10;     // size of the base XZ plane
-const noiseFactorY = 70;    // factor of terrain noise in Y direction. Bigger values create higher mountains
-const noiseFactorXZ = 20;  // factor of terrain noise in X and Z directions. Bigger values create more variation in terrain
+const planeSize = 80;      // size of the base XZ plane
+const noiseFactorY = 7;    // factor of terrain noise in Y direction. Bigger values create higher mountains
+const noiseFactorXZ = 15;  // factor of terrain noise in X and Z directions. Smaller values create more variation in terrain
 const noiseFactorAdd = 5;  // bigger values mean higher terrain
 const waterLevel = 3       // empty spaces below this Y are water
 
-// TODO: terrain visualization
-let meshCenter: THREE.Vector2;
-const meshRadius = 50;
+// terrain visualization
+const cameraFar = 1200;    // how far the camera can see
+// TODO: generate terrain around the player, in runtime
+// let meshCenter: THREE.Vector2;
+// const meshRadius = 50;
 
 // terrain state
 let cubes = {
@@ -88,6 +90,9 @@ function onKeyUp(event) {
     case 'ArrowDown':  position.y -= 50; break;
     case 'ArrowLeft':  speed -= 50; break;
     case 'ArrowRight': speed += 50; break;
+    case 'KeyR':
+      // show/hide debug stats
+      stats.dom.style.display = stats.dom.style.display === 'none' ? '' : 'none';
   }
 };
 
@@ -108,6 +113,7 @@ function init() {
   // Three.js variables
   stats = new Stats();
   document.body.appendChild(stats.dom);
+  stats.dom.style.display = 'none';
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -122,10 +128,7 @@ function init() {
   raycasterMouse = new THREE.Raycaster();
 
   // camera
-  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1500);
-  camera.position.y = 5;
-  camera.position.z = 50;
-  camera.position.x = 50;
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, cameraFar);
   // scene.add(new THREE.CameraHelper(camera));
 
   // lights
@@ -162,8 +165,8 @@ function init() {
   });
 
   // initial position of the player
-  position.x = cubeSize * planeSize / 2;
-  position.z = cubeSize * planeSize / 2;
+  position.x = cubeSize * 0.8 * planeSize;
+  position.z = cubeSize * 0.8 * planeSize;
   position.y = cubeSize * 15;
 
   // window resize
