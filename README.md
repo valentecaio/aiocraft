@@ -1,6 +1,6 @@
 ## AioCraft
 
-Try it at [valentecaio.ovh/aiocraft](http://valentecaio.ovh:5174/aiocraft/).
+Try it at [valentecaio.ovh/aiocraft](https://valentecaio.ovh/aiocraft/).
 
 ![screenshot1.png](https://github.com/valentecaio/aiocraft/blob/main/.github/screenshot1.png?raw=true)
 
