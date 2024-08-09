@@ -4,7 +4,7 @@ Try it at [valentecaio.itch.io/aiocraft](https://valentecaio.itch.io/aiocraft).
 
 ![screenshot1.png](https://github.com/valentecaio/aiocraft/blob/main/.github/screenshot1.png?raw=true)
 
-AioCraft is a first-person game built with the Three.js library. It uses GPU instancing to render a scene composed of texels (cubes) which are randomly generated from a Perlin noise function. The collision and gravity are handled using the native ray tracing Three.js module.
+AioCraft is a first-person game built with the Three.js library. It uses GPU instancing to render a scene composed of voxels (cubes) which are randomly generated from a Perlin noise function. The collision and gravity are handled using the native ray tracing Three.js module.
 
 For more information, see [this presentation](.github/aiocraft.pdf) (in Portuguese) ot [this demonstration video](.github/video1.mp4).
 
