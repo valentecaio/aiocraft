@@ -35,8 +35,8 @@ To build the project, follow the steps below.
 1. Install Node.js from [nodejs.org](https://nodejs.org).
 2. Install the dependencies: `$ npm install`
 3. Run the build script: `$ npm run build`
-4. The build will be available in the `dist` folder.
-5. Zip the contents of the `dist` folder and upload it to a server.
+4. The build will be available in the `dist/` folder.
+5. Zip the contents of the `dist/` folder and upload it to a server.
 
 ---
 ### Different types of terrain
